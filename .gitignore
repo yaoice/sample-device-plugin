@@ -1,0 +1,9 @@
+/.vscode/
+/.idea/
+/output/
+/_output/
+/debug/
+/res
+/data
+.DS_Store
+/bin

@@ -1,0 +1,43 @@
+# Tencent is pleased to support the open source community by making TKEStack
+# available.
+#
+# Copyright (C) 2012-2019 Tencent. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+# this file except in compliance with the License. You may obtain a copy of the
+# License at
+#
+# https://opensource.org/licenses/Apache-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OF ANY KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations under the License.
+
+## global scope TARGETPLATFORM
+## ref: https://docs.docker.com/engine/reference/builder/#automatic-platform-args-in-the-global-scope
+FROM --platform=${TARGETPLATFORM} golang:1.15.4 AS builder
+ARG TARGETPLATFORM
+RUN echo "building for ${TARGETPLATFORM}"
+ARG WORKDIR="/go/src/github.com/yaoice/sample-device-plugin/"
+RUN mkdir -p ${WORKDIR}
+WORKDIR ${WORKDIR}
+## cache dependancies if we won't change mod/sum
+COPY go.mod go.sum ${WORKDIR}
+RUN go mod download
+
+COPY . ${WORKDIR}
+RUN make build BINS="sample-device-plugin"
+ARG TARGETARCH
+ARG OUTPUTDIR="_output/bin-${TARGETARCH}"
+RUN mv -f ${OUTPUTDIR}/* /
+WORKDIR /
+
+
+
+FROM --platform=${TARGETPLATFORM} centos:7
+
+LABEL maintainer="iceyao(yao3690093@gmail.com)"
+LABEL description="This Dockerfile is written for sample-device-plugin"
+WORKDIR /root/
+COPY --from=builder sample-device-plugin /usr/bin/

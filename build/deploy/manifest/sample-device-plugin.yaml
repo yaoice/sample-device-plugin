@@ -1,0 +1,89 @@
+---
+# Source: sample-device-plugin/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sample-device-plugin-admin
+  namespace: kube-system
+  labels:
+    helm.sh/chart: sample-device-plugin-0.1.0
+    app.kubernetes.io/name: sample-device-plugin
+---
+# Source: sample-device-plugin/templates/cluster-role-binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sample-device-plugin-admin-binding
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - kind: ServiceAccount
+    name: sample-device-plugin-admin
+    namespace: kube-system
+---
+# Source: sample-device-plugin/templates/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: sample-device-plugin
+  namespace: kube-system
+  labels:
+    helm.sh/chart: sample-device-plugin-0.1.0
+    app.kubernetes.io/name: sample-device-plugin
+spec:
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sample-device-plugin
+  template:
+    metadata:
+      # This annotation is deprecated. Kept here for backward compatibility
+      # See https://kubernetes.io/docs/tasks/administer-cluster/guaranteed-scheduling-critical-addon-pods/
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ""
+      labels:
+        app.kubernetes.io/name: sample-device-plugin
+    spec:
+      serviceAccountName: sample-device-plugin-admin
+      securityContext:
+        {}
+      containers:
+        - name: sample-device-plugin
+          securityContext:
+            {}
+          image: "iceyao/sample-device-plugin-amd64:6479925.dirty"
+          imagePullPolicy: IfNotPresent
+          command: ["/usr/bin/sample-device-plugin"]
+          resources:
+            {}
+          volumeMounts:
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: devices
+              mountPath: /etc/samples
+      nodeSelector:
+        sample-device: enable
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoSchedule
+          key: sample.com/sample-device-plugin
+          operator: Exists
+      # Mark this pod as a critical add-on; when enabled, the critical add-on
+      # scheduler reserves resources for critical add-on pods so that they can
+      # be rescheduled after a failure.
+      # See https://kubernetes.io/docs/tasks/administer-cluster/guaranteed-scheduling-critical-addon-pods/
+      priorityClassName: "system-node-critical"
+      hostPID: true
+      volumes:
+        - name: device-plugin
+          hostPath:
+            type: Directory
+            path: /var/lib/kubelet/device-plugins
+        - name: devices
+          hostPath:
+            type: Directory
+            path: /etc/samples
